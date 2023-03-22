@@ -1,0 +1,64 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Parameters:
+  VpcId:
+    Type: String
+    Description: The ID of the VPC to check.
+Resources:
+  MyLambdaFunction:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      FunctionName: lambda-function
+      Handler: lambda_function.lambda_handler
+      Role: !GetAtt MyLambdaFunctionRole.Arn
+      Code:
+        S3Bucket: test-dg-assign
+        S3Key: Lambda.zip
+      Runtime: python3.8
+  MyLambdaFunctionRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: lambda-function-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: my-lambda-function-policy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: logs:CreateLogGroup
+                Resource: arn:aws:logs:*:*:*
+              - Effect: Allow
+                Action: logs:CreateLogStream
+                Resource: arn:aws:logs:*:*:/aws/lambda/my-lambda-function
+              - Effect: Allow
+                Action: logs:PutLogEvents
+                Resource: arn:aws:logs:*:*:/aws/lambda/my-lambda-function
+              - Effect: Allow
+                Action: ec2:*
+                Resource: "*"
+  CustomResource:
+    Type: Custom::VpcExists
+    Properties:
+      ServiceToken: !GetAtt MyLambdaFunction.Arn
+      VpcId: !Ref VpcId
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: MySecurityGroup
+      GroupDescription: Allow SSH access from Custom Resource CIDR range
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !GetAtt CustomResource.CidrIp
+Outputs:
+  VpcCidrIp:
+    Value: !GetAtt CustomResource.CidrIp
+    Description: The CIDR IP range of the VPC with the specified VPC ID.

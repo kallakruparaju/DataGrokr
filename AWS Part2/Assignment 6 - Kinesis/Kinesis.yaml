@@ -1,0 +1,83 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Resources:
+  MyKinesisStream:
+    Type: AWS::Kinesis::Stream
+    Properties:
+      Name: my-kinesis-stream
+      ShardCount: 1
+  MyDynamoDBTable:
+    Type: "AWS::DynamoDB::Table"
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: "sequenceNumber"
+          AttributeType: "S"
+      KeySchema:
+        - AttributeName: "sequenceNumber"
+          KeyType: "HASH"
+      ProvisionedThroughput:
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 5
+      TableName: "my-table-name"
+  MyLambdaFunction:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      FunctionName: my-lambda-function
+      Handler: app.lambda_handler
+      Role: !GetAtt MyLambdaFunctionRole.Arn
+      Code:
+        S3Bucket: test-dg-assign
+        S3Key: KinesisCreation.zip
+      Runtime: python3.8
+  MyBackendLambdaFunction:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      FunctionName: my-backend-lambda-function
+      Handler: backend.lambda_handler
+      Role: !GetAtt MyLambdaFunctionRole.Arn
+      Code:
+        S3Bucket: test-dg-assign
+        S3Key: KinesisBackend.zip
+      Runtime: python3.8
+  MyLambdaFunctionRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: my-lambda-function-role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: my-lambda-function-policy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: logs:CreateLogGroup
+                Resource: arn:aws:logs:*:*:*
+              - Effect: Allow
+                Action: logs:CreateLogStream
+                Resource: arn:aws:logs:*:*:/aws/lambda/my-lambda-function
+              - Effect: Allow
+                Action: logs:PutLogEvents
+                Resource: arn:aws:logs:*:*:/aws/lambda/my-lambda-function
+              - Effect: Allow
+                Action: kinesis:*
+                Resource: "*"
+              - Effect: Allow
+                Action: dynamodb:*
+                Resource: "*"
+  MyEventSourceMapping:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      EventSourceArn:
+          Fn::GetAtt:
+            - "MyKinesisStream"
+            - "Arn"
+      FunctionName:
+          Fn::GetAtt:
+            - "MyBackendLambdaFunction"
+            - "Arn"
+      StartingPosition: "TRIM_HORIZON"

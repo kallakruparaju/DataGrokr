@@ -1,0 +1,48 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  ec2-state-monitor
+  Sample SAM Template for ec2-state-monitor
+
+Resources:
+  EC2StateMonitorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: app.lambda_handler
+      Runtime: python3.8
+      CodeUri: ec2_state_monitor
+      Timeout: 30
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref EC2StateTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref EC2StateTable
+      Events:
+        EC2StateEvent:
+          Type: CloudWatchEvent
+          Properties:
+            Pattern:
+              source:
+                - aws.ec2
+              detail-type:
+                - EC2 Instance State-change Notification
+              detail:
+                state:
+                  - pending
+                  - running
+                  - stopped
+                  - terminated
+  EC2StateTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: instance_id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: instance_id
+          KeyType: HASH
+      ProvisionedThroughput:
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 5
+      TableName: EC2StateTable

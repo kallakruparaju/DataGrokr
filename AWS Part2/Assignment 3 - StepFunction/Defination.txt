@@ -1,0 +1,124 @@
+{
+  "StartAt": "initial_stage_DynamoDB_putRecord",
+  "States": {
+    "initial_stage_DynamoDB_putRecord": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::dynamodb:putItem",
+      "Parameters": {
+        "TableName": "step_function",
+        "Item.$": "$.Item"
+      },
+      "ResultPath": "$.output",
+      "Next": "Passing_InstanceID"
+    },
+    "Passing_InstanceID": {
+      "Type": "Pass",
+      "InputPath": "$.Item.existing-instance-id.S",
+      "Next": "LambdaInvokeToCreateAMI"
+    },
+    "LambdaInvokeToCreateAMI": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "OutputPath": "$.Payload",
+      "Parameters": {
+        "FunctionName": "arn:aws:lambda:ap-south-1:628906266361:function:Function1:$LATEST",
+        "Payload": {
+          "InstanceID.$": "$"
+        }
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 6,
+          "BackoffRate": 2
+        }
+      ],
+      "Next": "Passing_AMI_ID"
+    },
+    "Passing_AMI_ID": {
+      "Type": "Pass",
+      "InputPath": "$.body",
+      "Next": "LambdaInvokeToLaunchInstance"
+    },
+    "LambdaInvokeToLaunchInstance": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "OutputPath": "$.Payload",
+      "Parameters": {
+        "FunctionName": "arn:aws:lambda:ap-south-1:628906266361:function:Function2:$LATEST",
+        "Payload": {
+          "Body.$": "$"
+        }
+      },
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 6,
+          "BackoffRate": 2
+        }
+      ],
+      "Next": "Choice"
+    },
+    "Choice": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.statusCode",
+          "NumericEquals": 200,
+          "Next": "DynamoDBSuccessUpdate"
+        }
+      ],
+      "Default": "DynamoDBFailureUpdate"
+    },
+    "DynamoDBSuccessUpdate": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::dynamodb:updateItem",
+      "Parameters": {
+        "TableName": "step_function",
+        "Key": {
+          "step_function_name": {
+            "S": "sample-step-function"
+          }
+        },
+        "UpdateExpression": "SET step_function_status = :myValueRef",
+        "ExpressionAttributeValues": {
+          ":myValueRef": {
+            "S": "Sucess"
+          }
+        }
+      },
+      "End": true
+    },
+    "DynamoDBFailureUpdate": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::dynamodb:updateItem",
+      "Parameters": {
+        "TableName": "step_function",
+        "Key": {
+          "step_function_name": {
+            "S": "sample-step-function"
+          }
+        },
+        "UpdateExpression": "SET step_function_status = :myValueRef",
+        "ExpressionAttributeValues": {
+          ":myValueRef": {
+            "S": "Failure"
+          }
+        }
+      },
+      "End": true
+    }
+  }
+}
