@@ -1,0 +1,42 @@
+Parameters:
+  bucketname:
+    Type: String
+    Description: Name of the bucket
+    Default: test-bucket-for-cloud-formation-new
+Resources:
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Properties: 
+      BucketName: !Ref bucketname
+      AccelerateConfiguration:
+        AccelerationStatus: Enabled
+      VersioningConfiguration: 
+        Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+      Tags:
+      - Key: Name
+        Value: kallakruparaju
+  
+  SampleBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    DependsOn: S3Bucket
+    Properties:
+      Bucket: !Ref bucketname
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action:
+              - 's3:GetObject'
+            Effect: Allow
+            Resource: !Join
+              - ''
+              - - 'arn:aws:s3:::'
+                - !Ref bucketname
+                - /*
+            Principal: '*'
+
+                

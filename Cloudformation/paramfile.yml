@@ -1,0 +1,6 @@
+[
+    {
+        "ParameterKey": "bucketname",
+        "ParameterValue": "test-bucket-for-cloud-formation"
+    }
+]
